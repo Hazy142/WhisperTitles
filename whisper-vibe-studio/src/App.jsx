@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Download, AlertCircle, Activity, Gauge, Settings2, Languages, Music } from 'lucide-react';
-import './App.css'; // Optional, falls du Styles hast
+import { Upload, FileText, Download, AlertCircle, Activity, Gauge, Settings2, Languages, Music, Zap } from 'lucide-react';
+import './App.css'; 
 
 export default function App() {
   // --- STATE ---
@@ -25,7 +25,6 @@ export default function App() {
 
   // --- WORKER SETUP ---
   useEffect(() => {
-    // VITE MAGIC: Importiere den Worker sauber
     const newWorker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
 
     newWorker.onmessage = (e) => {
@@ -62,7 +61,6 @@ export default function App() {
     };
 
     setWorker(newWorker);
-    // Initial Load
     newWorker.postMessage({ type: 'load', data: { model: 'Xenova/whisper-base' } });
 
     return () => newWorker.terminate();
@@ -101,7 +99,6 @@ export default function App() {
         const fileData = await audioFile.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(fileData);
         
-        // Resampling Logic
         const offlineCtx = new OfflineAudioContext(1, audioBuffer.duration * 16000, 16000);
         const source = offlineCtx.createBufferSource();
         source.buffer = audioBuffer;
@@ -215,6 +212,16 @@ export default function App() {
       <main className="max-w-5xl mx-auto px-4 py-12">
         <div className="text-center mb-12">
           {status === 'loading_model' && renderDownloadStatus()}
+          
+          {/* --- HIER IST DER NEUE TEIL --- */}
+          {status === 'ready' && !transcript && (
+             <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm animate-pulse mt-4">
+                <Zap className="w-4 h-4" />
+                <span className="font-semibold">{statusMessage}</span>
+             </div>
+          )}
+          {/* ----------------------------- */}
+
           {status === 'processing' && <div className="text-white animate-pulse mt-4">Verarbeite Audio... <span className="block text-xs text-slate-400">{statusMessage}</span></div>}
           {status === 'error' && <div className="text-red-400 bg-red-900/20 p-4 rounded border border-red-500/50 inline-block mt-4"><AlertCircle className="inline mr-2"/>{statusMessage}</div>}
         </div>

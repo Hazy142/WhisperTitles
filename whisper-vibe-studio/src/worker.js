@@ -1,6 +1,6 @@
 import { pipeline, env } from '@xenova/transformers';
 
-// Konfiguration: Erlaubt das Laden von externen Modellen (HuggingFace Hub)
+// Konfiguration
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
@@ -14,15 +14,11 @@ self.addEventListener('message', async (event) => {
         try {
             const modelName = data.model || 'Xenova/whisper-base';
             
-            // Wenn das Modell schon geladen ist, abbrechen
             if (transcriber && currentModel === modelName) {
                 self.postMessage({ status: 'ready', message: 'Modell bereits geladen.' });
                 return;
             }
 
-            self.postMessage({ status: 'loading', message: `Initialisiere ${modelName}...` });
-
-            // Hilfsfunktion für den Ladebalken
             const progressCallback = (data) => {
                 if (data.status === 'progress') {
                     self.postMessage({ 
@@ -39,30 +35,39 @@ self.addEventListener('message', async (event) => {
             };
 
             try {
-                // 1. VERSUCH: WEBGPU (Turbo Modus) 🚀
+                // 1. VERSUCH: WEBGPU 🚀
                 console.log('Versuche WebGPU Start...');
-                self.postMessage({ status: 'loading', message: `Starte ${modelName} mit GPU-Power...` });
+                // Wir sagen der UI, was wir tun
+                self.postMessage({ status: 'loading', message: `Starte ${modelName} auf GPU...` });
 
                 transcriber = await pipeline('automatic-speech-recognition', modelName, {
                     quantized: true,
-                    device: 'webgpu', // <--- HIER IST DER SCHLÜSSEL
+                    device: 'webgpu', 
                     progress_callback: progressCallback
                 });
 
                 self.postMessage({ status: 'ready', message: 'AI Engine bereit (GPU-Modus) 🚀' });
 
             } catch (gpuError) {
-                // 2. FALLBACK: CPU (Sicherheitsnetz) 🛡️
-                console.warn("WebGPU Start fehlgeschlagen, wechsle auf CPU...", gpuError);
-                self.postMessage({ status: 'loading', message: 'GPU nicht verfügbar. Starte CPU-Modus...' });
+                // 2. FEHLER-ANALYSE 🕵️‍♂️
+                // Wir zeigen den Fehler jetzt direkt in der UI an, statt ihn zu verstecken!
+                console.error("WebGPU Fehler:", gpuError);
+                
+                const errorText = gpuError.message || JSON.stringify(gpuError);
+                
+                // Kurzer Moment, damit man den Fehler lesen kann, dann Fallback
+                self.postMessage({ status: 'loading', message: `GPU-Fehler: ${errorText}. Wechsel auf CPU...` });
+                
+                // Kleine Pause (2 Sekunden), damit du den Text lesen kannst
+                await new Promise(r => setTimeout(r, 3000));
 
                 transcriber = await pipeline('automatic-speech-recognition', modelName, {
                     quantized: true,
-                    device: 'cpu', // Fallback auf Prozessor
+                    device: 'cpu', 
                     progress_callback: progressCallback
                 });
 
-                self.postMessage({ status: 'ready', message: 'AI Engine bereit (CPU-Modus)' });
+                self.postMessage({ status: 'ready', message: `Bereit (CPU-Modus - GPU Fehler: ${errorText.substring(0, 20)}...)` });
             }
 
             currentModel = modelName;
@@ -86,7 +91,7 @@ self.addEventListener('message', async (event) => {
                 chunk_length_s: 30,
                 stride_length_s: 5,
                 return_timestamps: true,
-                repetition_penalty: 1.4, // Wichtig gegen Loops bei Musik
+                repetition_penalty: 1.4,
                 no_speech_threshold: 0.6, 
             };
 
